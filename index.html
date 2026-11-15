@@ -1,0 +1,192 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Japanese Study Timer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+/* Layout: one centered column. Big clock + Start/Stop on top, today's sessions below, history and export last. */
+:root{
+  --bg:#f3f5f9; --card:#ffffff; --fg:#16213a; --muted:#5b6780; --line:#dde3ee;
+  --indigo:#2b3a67; --indigo-fg:#ffffff; --stamp:#c4372c; --stamp-fg:#ffffff; --ok:#2f7d55; --track:#e4e9f3;
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1524; --card:#182038; --fg:#e8ecf6; --muted:#9aa6c2; --line:#2a3555;
+  --indigo:#8fa4e8; --indigo-fg:#0f1524; --stamp:#e2594d; --stamp-fg:#0f1524; --ok:#5cc08c; --track:#26304d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1524; --card:#182038; --fg:#e8ecf6; --muted:#9aa6c2; --line:#2a3555;
+  --indigo:#8fa4e8; --indigo-fg:#0f1524; --stamp:#e2594d; --stamp-fg:#0f1524; --ok:#5cc08c; --track:#26304d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:1.6rem;margin:0;letter-spacing:.01em;text-wrap:balance}
+h2{font-family:var(--display);font-size:1.05rem;margin:0 0 10px}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+.timer{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.clock{font-family:var(--display);font-size:clamp(3rem,16vw,4.6rem);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1}
+.state{font-size:.85rem;color:var(--muted);min-height:1.3em}
+.fields{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;width:100%}
+@media (max-width:480px){.fields{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:left;min-width:0}
+select,input[type=text]{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%;text-transform:none;letter-spacing:0}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:9px 14px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--indigo);outline-offset:2px}
+.go{width:100%;max-width:340px;padding:15px;font-size:1.1rem;font-weight:700;border:0;background:var(--indigo);color:var(--indigo-fg)}
+.go.stop{background:var(--stamp);color:var(--stamp-fg)}
+.bar{height:10px;background:var(--track);border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.table{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:420px}
+th{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right}
+.x{padding:2px 8px;font-size:.85rem;color:var(--muted)}
+.empty{color:var(--muted);padding:6px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.hist{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;height:120px;margin-top:6px}
+.hist div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;min-width:0}
+.hist b{display:block;width:100%;background:var(--indigo);border-radius:4px 4px 0 0;min-height:2px}
+.hist span{font-size:.7rem;color:var(--muted)}
+textarea{width:100%;min-height:90px;font:12px/1.4 ui-monospace,Menlo,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px}
+.toast{min-height:1.3em;font-size:.85rem;color:var(--ok)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>日本語 Study Timer</h1>
+    <p class="sub">Press Start when you begin and Stop when you finish. Each session is saved with its date, start time and end time, ready to paste into the Daily Log sheet.</p>
+  </header>
+
+  <section class="card timer" aria-label="Timer">
+    <div class="clock" id="clock" role="timer" aria-live="off">00:00:00</div>
+    <div class="state" id="state">Ready. Choose a subject and press Start.</div>
+    <div class="fields">
+      <label>Subject
+        <select id="subject">
+          <option>Vocabulary</option><option>Kanji</option><option>Grammar</option><option>Listening</option>
+          <option>Reading</option><option>Speaking</option><option>Tech Japanese</option>
+          <option>Mock / Practice Test</option><option>Revision</option>
+        </select>
+      </label>
+      <label>Notes (optional)
+        <input type="text" id="notes" placeholder="e.g. て-form, Genki lesson 4" autocomplete="off">
+      </label>
+    </div>
+    <button class="go" id="go">Start</button>
+  </section>
+
+  <section class="card" aria-label="Today">
+    <div class="row"><h2>Today</h2><span class="num"><b id="todayMin">0</b> / <span id="goalMin">120</span> min</span></div>
+    <div class="bar"><i id="todayBar"></i></div>
+    <div class="table" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Start</th><th>End</th><th>Subject</th><th>Notes</th><th class="r">Min</th><th></th></tr></thead>
+        <tbody id="todayRows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="todayEmpty">No sessions yet today.</div>
+  </section>
+
+  <section class="card" aria-label="Last 7 days">
+    <div class="row"><h2>Last 7 days</h2><span class="muted num" id="weekTotal"></span></div>
+    <div class="hist" id="hist"></div>
+  </section>
+
+  <section class="card" aria-label="Export">
+    <h2>Move sessions to Excel</h2>
+    <p class="sub">Copy the sessions, open the Daily Log sheet, click the first empty Date cell and paste. The Minutes, Week and Dashboard columns fill in on their own.</p>
+    <div class="actions">
+      <button id="copyToday">Copy today's sessions</button>
+      <button id="copyAll">Copy all sessions</button>
+      <button id="clearAll">Delete all sessions</button>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <textarea id="manual" readonly hidden aria-label="Sessions to copy"></textarea>
+    <p class="sub">Sessions are stored in this browser only. Copy them into Excel regularly so you keep a permanent record.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  var KEY="jp-study-sessions-v1", RUN="jp-study-running-v1", GOAL=120;
+  var $=function(id){return document.getElementById(id)};
+  var sessions=[], running=null, tick=null;
+
+  function load(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
+  function save(k,v){try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  function pad(n){return n<10?"0"+n:""+n}
+  function dstr(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+  function tstr(d){return pad(d.getHours())+":"+pad(d.getMinutes())}
+  function hms(ms){var s=Math.max(0,Math.floor(ms/1000));return pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60)}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function mins(s){return Math.max(1,Math.round((s.end-s.start)/60000))}
+
+  function render(){
+    var today=dstr(new Date());
+    var td=sessions.filter(function(s){return dstr(new Date(s.start))===today});
+    var total=td.reduce(function(a,s){return a+mins(s)},0);
+    if(running&&dstr(new Date(running.start))===today){}
+    $("todayMin").textContent=total;
+    $("goalMin").textContent=GOAL;
+    $("todayBar").style.width=Math.min(100,total/GOAL*100)+"%";
+    $("todayEmpty").hidden=td.length>0;
+    $("todayRows").innerHTML=td.map(function(s){
+      return "<tr><td class='num'>"+tstr(new Date(s.start))+"</td><td class='num'>"+tstr(new Date(s.end))+"</td><td>"+esc(s.subject)+"</td><td>"+esc(s.notes)+"</td><td class='r num'>"+mins(s)+"</td><td><button class='x' data-id='"+s.id+"' aria-label='Delete session'>Delete</button></td></tr>";
+    }).join("");
+    var days=[],max=1,wt=0,i;
+    for(i=6;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);var k=dstr(d);
+      var m=sessions.filter(function(s){return dstr(new Date(s.start))===k}).reduce(function(a,s){return a+mins(s)},0);
+      days.push({d:d,m:m});max=Math.max(max,m);wt+=m}
+    var names=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    $("hist").innerHTML=days.map(function(x){return "<div title='"+x.m+" min'><span class='num'>"+x.m+"</span><b style='height:"+Math.round(x.m/max*80)+"%'></b><span>"+names[x.d.getDay()]+"</span></div>"}).join("");
+    $("weekTotal").textContent=Math.floor(wt/60)+" h "+(wt%60)+" min total";
+    var go=$("go");
+    if(running){go.textContent="Stop";go.className="go stop";$("subject").value=running.subject;$("state").textContent="Studying "+running.subject+", started "+tstr(new Date(running.start))}
+    else{go.textContent="Start";go.className="go";$("clock").textContent="00:00:00";$("state").textContent="Ready. Choose a subject and press Start."}
+  }
+  function startTick(){clearInterval(tick);tick=setInterval(function(){if(running)$("clock").textContent=hms(Date.now()-running.start)},500);if(running)$("clock").textContent=hms(Date.now()-running.start)}
+
+  $("go").onclick=function(){
+    if(!running){
+      running={start:Date.now(),subject:$("subject").value,notes:$("notes").value.trim()};
+      save(RUN,running);startTick();
+    }else{
+      running.notes=$("notes").value.trim();
+      var s={id:Date.now(),start:running.start,end:Date.now(),subject:running.subject,notes:running.notes};
+      sessions.push(s);sessions.sort(function(a,b){return a.start-b.start});save(KEY,sessions);
+      running=null;save(RUN,null);clearInterval(tick);$("notes").value="";
+      toast("Saved: "+mins(s)+" min of "+s.subject);
+    }
+    render();
+  };
+  $("subject").onchange=function(){if(running){running.subject=$("subject").value;save(RUN,running);render()}};
+  $("todayRows").onclick=function(e){var id=e.target.getAttribute&&e.target.getAttribute("data-id");if(!id)return;
+    sessions=sessions.filter(function(s){return String(s.id)!==id});save(KEY,sessions);render()};
+
+  function tsv(list){return list.map(function(s){return [dstr(new Date(s.start)),tstr(new Date(s.start)),tstr(new Date(s.end)),s.subject,(s.notes||"").replace(/[\t\r\n]+/g," ")].join("\t")}).join("\n")}
+  function toast(t){$("toast").textContent=t;clearTimeout(toast.t);toast.t=setTimeout(function(){$("toast").textContent=""},4000)}
+  function copy(list,label){
+    if(!list.length){toast("Nothing to copy yet.");return}
+    var text=tsv(list), ta=$("manual");
+    function fallback(){ta.hidden=false;ta.value=text;ta.focus();ta.select();toast("Select and copy the text below ("+label+").")}
+    try{navigator.clipboard.writeText(text).then(function(){ta.hidden=true;toast("Copied "+list.length+" session(s). Paste into the Daily Log sheet.")},fallback)}catch(e){fallback()}
+  }
+  $("copyToday").onclick=function(){var t=dstr(new Date());copy(sessions.filter(function(s){return dstr(new Date(s.start))===t}),"today")};
+  $("copyAll").onclick=function(){copy(sessions,"all sessions")};
+  var armed=false;
+  $("clearAll").onclick=function(){
+    if(!armed){armed=true;$("clearAll").textContent="Press again to delete everything";setTimeout(function(){armed=false;$("clearAll").textContent="Delete all sessions"},4000);return}
+    sessions=[];save(KEY,sessions);armed=false;$("clearAll").textContent="Delete all sessions";render();toast("All sessions deleted.")};
+
+  sessions=load(KEY,[]);running=load(RUN,null);
+  if(running){$("notes").value=running.notes||"";startTick()}
+  render();
+})();
+</script>
+
+</body></html>
